@@ -5,6 +5,7 @@ import os
 from PIL import Image
 from hoyolab import get_all_characters, get_character_details, get_icon
 from scoring import get_rolls_detail
+from auth import login_and_get_cookies
 
 GOLD  = "#c8a96e"
 BEIGE = "#f0e6d3"
@@ -21,136 +22,235 @@ class App:
         self.window.title("Genshin Artifact Rater")
         self.window.geometry("1200x800")
         self.window.configure(fg_color=DARK)
-
-        self.cookies = self._load_cookies()
-        self._build_header()
+        
+        self.active_cookies = self._load_cookies()
+        
+        if self.active_cookies:
+            self._build_header()
+        else:
+            self._build_login_page()
 
     # ── Cookies ──────────────────────────────────────────────────────────────
 
     def _load_cookies(self):
-        if os.path.exists(COOKIES_FILE):
+        """
+        Charge les cookies depuis le fichier.
+        Retourne None si absent ou invalide.
+        """
+        
+        if not os.path.exists(COOKIES_FILE):
+            return None
+        
+        try:
             with open(COOKIES_FILE, "r") as f:
-                return json.load(f)
-        return {}
+                data = json.load(f)
+                
+            # Vérifier que les clés essentielles sont présentes
+            required = ["ltuid_v2", "ltoken_v2", "cookie_token_v2"]
+            if all(k in data for k in required):
+                return data
+        except Exception as e:
+            pass
+        return None
+    
 
-    def _save_cookies(self, uid, cookies):
-        all_cookies = self._load_cookies()
-        all_cookies[uid] = cookies
+    def _save_cookies(self, cookies, uid=None, nickname=None):
+        """
+        Sauvegarde les cookies avec l'UID et le Pseudo(nickname) si disponibles.
+        """
+        
+        os.makedirs("data", exist_ok=True)
+        data = dict(cookies)
+        if uid:
+            data["uid"] = uid
+        if nickname:
+            data["nickname"] = nickname
         with open(COOKIES_FILE, "w") as f:
-            json.dump(all_cookies, f)
+            json.dump(data, f, indent=2)
+            
 
+    # ── Page de connexion ────────────────────────────────────────────────────
+    
+    
+    def _build_login_page(self):
+        self.login_frame = ctk.CTkFrame(self.window, fg_color=DARK)
+        self.login_frame.pack(fill="both", expand=True)
+        
+        # Titre
+        ctk.CTkLabel(self.login_frame,
+                     text="✦ Genshin Artifact Rater ✦",
+                     font=ctk.CTkFont(size=14),
+                     text_color=BEIGE).pack(pady=(0, 60))
+        
+        # Bouton connexion
+        self.connect_btn = ctk.CTkButton(
+            self.login_frame,
+            text="Se connecter avec HoyoLAB",
+            width=300, height=52,
+            fg_color=GOLD, text_color=DARK,
+            hover_color="#a08050",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            command=self._do_login
+        )
+        self.connect_btn.pack()
+        
+        ctk.CTkLabel(self.login_frame,
+                     text="Une fenêtre de connexion HoyoLAB s'ouvrira",
+                     font=ctk.CTkFont(size=11),
+                     text_color="#888888").pack(pady=(12, 0))
+        
+    def _do_login(self):
+        self.connect_btn.configure(text="Connexion en cours...", state="disabled")
+        
+        def do():
+            cookies = login_and_get_cookies()
+            if cookies:
+                self._save_cookies(cookies)
+                self.active_cookies = cookies
+                self.window.after(0, lambda: self.connect_btn.configure(
+                    text="Se connecter avec HoyoLAB", state="normal"))
+        
+        threading.Thread(target=do, daemon=True).start()
+    
+    
+    def _on_login_success(self):
+        self.login_frame.destroy()
+        self._build_header()
+
+    
     # ── Header ───────────────────────────────────────────────────────────────
 
     def _build_header(self):
         header = ctk.CTkFrame(self.window, fg_color="#0d0d1a", height=80, corner_radius=0)
         header.pack(fill="x")
 
+        # Titre
         ctk.CTkLabel(header, text="✦ Genshin Artifact Rater ✦",
                      font=ctk.CTkFont(size=22, weight="bold"),
                      text_color=GOLD).pack(side="left", padx=20, pady=20)
-
-        # Champs cookies (masqués si déjà sauvegardés)
-        self.ltuid_entry = ctk.CTkEntry(header, placeholder_text="ltuid_v2",
-                                        width=120, height=36,
-                                        fg_color="#2a2a3e", border_color=GOLD,
-                                        text_color=BEIGE)
-        self.ltuid_entry.pack(side="left", padx=5, pady=20)
-        if self.cookies.get("ltuid_v2"):
-            self.ltuid_entry.insert(0, self.cookies["ltuid_v2"])
-
-        self.ltoken_entry = ctk.CTkEntry(header, placeholder_text="ltoken_v2",
-                                         width=180, height=36, show="*",
-                                         fg_color="#2a2a3e", border_color=GOLD,
-                                         text_color=BEIGE)
-        self.ltoken_entry.pack(side="left", padx=5, pady=20)
-        if self.cookies.get("ltoken_v2"):
-            self.ltoken_entry.insert(0, self.cookies["ltoken_v2"])
-
-        self.uid_entry = ctk.CTkEntry(header, placeholder_text="UID Genshin",
-                                      width=140, height=36,
-                                      fg_color="#2a2a3e", border_color=GOLD,
-                                      text_color=BEIGE)
-        self.uid_entry.pack(side="left", padx=5, pady=20)
-
-        def on_load():
-            ltuid  = self.ltuid_entry.get()
-            ltoken = self.ltoken_entry.get()
-            uid    = self.uid_entry.get()
-            if not uid:
-                return
-
-            # Si cookies pas remplis, essaye de les charger depuis la sauvegarde
-            if not ltuid or not ltoken:
-                saved = self.cookies.get(uid)
-                if saved:
-                    ltuid  = saved["ltuid_v2"]
-                    ltoken = saved["ltoken_v2"]
-                else:
-                    return  # Pas de cookies connus pour cet UID
-
-            cookies = {
-                "ltuid_v2": ltuid,
-                "ltoken_v2": ltoken,
-                "mi18nLang": "fr-fr",
-            }
-            self._save_cookies(uid, cookies)
-            self.cookies = self._load_cookies()
-
-            # ← cookies actifs pour cette session
-            active_cookies = cookies
-
-            self.load_btn.configure(text="Chargement...", state="disabled")
-
-            def load_data():
-                try:
-                    avatars = get_all_characters(active_cookies, uid)
-                    ids = [a["id"] for a in avatars]
-                    details, property_map = get_character_details(active_cookies, uid, ids)
-                    self.property_map = property_map
-                    # Fusionner infos de base + détails
-                    base_map = {a["id"]: a for a in avatars}
-                    self.characters = []
-                    for d in details:
-                        base = base_map.get(d["base"]["id"], {})
-                        self.characters.append({
-                            "id":       d["base"]["id"],
-                            "name":     d["base"]["name"],
-                            "image":    d["base"]["image"],
-                            "element":  d["base"]["element"],
-                            "level":    d["base"]["level"],
-                            "relics":   d["relics"],
-                        })
-                    self.window.after(0, self._build_tabs)
-                except Exception as e:
-                    print(f"Erreur : {e}")
-                finally:
-                    self.window.after(0, lambda: self.load_btn.configure(
-                        text="Charger", state="normal"))
-
-            threading.Thread(target=load_data, daemon=True).start()
-
+        
+        #Nickname si disponible
+        nickname = self.active_cookies.get("nickname")
+        uid = self.active_cookies.get("uid")
+        if nickname:
+            ctk.CTkLabel(header,
+                         text=f"Connecté : {nickname}",
+                         font=ctk.CTkFont(size=13),
+                         text_color=BEIGE).pack(side="left", padx=10)
+        
+        
+        # Bouton charger
         self.load_btn = ctk.CTkButton(header, text="Charger",
                                       width=100, height=36,
                                       fg_color=GOLD, text_color=DARK,
-                                      hover_color="#a08050", command=on_load)
-        self.load_btn.pack(side="left", padx=5, pady=20)
+                                      hover_color="#a08050",
+                                      command=self._on_load)
+        self.load_btn.pack(side="right", padx=5, pady=20)
         
-        def on_uid_change(event=None):
-            uid = self.uid_entry.get()
-            saved = self.cookies.get(uid)
-            if saved:
-                self.ltuid_entry.delete(0, "end")
-                self.ltuid_entry.insert(0, saved["ltuid_v2"])
-                self.ltoken_entry.delete(0, "end")
-                self.ltoken_entry.insert(0, saved["ltoken_v2"])
+        # Bouton changer de compte
+        ctk.CTkButton(header, text="Changer de compte",
+                      width=100, height=36,
+                      fg_color=GOLD, text_color=DARK,
+                      hover_color="#a08050",
+                      command=self._change_account).pack(side="right", padx=10, pady=20)
+        
+        
+        # Champ UID
+        self.uid_entry = ctk.CTkEntry(header, placeholder_text="UID Genshin",
+                                     width=140, height=36,
+                                     fg_color="#2a2a3e", border_color=GOLD,
+                                     text_color=BEIGE)
+        
+        self.uid_entry.pack(side="right", padx=5, pady=20)
+        
+        # Pré-remplir l'UID si sauvegardé
+        if uid:
+            self.uid_entry.insert(0, uid)
+        
+        
+    def _change_account(self):
+        """
+        Supprime les cookies et retourne à la page de connexion.
+        """
+        
+        if os.path.exists(COOKIES_FILE):
+            os.remove(COOKIES_FILE)
+        self.active_cookies = None
+        
+        # Détruire tout et reconstruire
+        for widget in self.window.winfo_children():
+            widget.destroy()
+        self._build_login_page()
+        
+    def _on_load(self):
+        uid = self.uid_entry.get().strip()
+        if not uid:
+            return
+        
+        # Construire les cookies actifs
+        cookies = {
+            "ltuid_v2":        self.active_cookies["ltuid_v2"],
+            "ltoken_v2":       self.active_cookies["ltoken_v2"],
+            "cookie_token_v2": self.active_cookies["cookie_token_v2"],
+            "account_mid_v2":  self.active_cookies["account_mid_v2"],
+            "account_id_v2":   self.active_cookies["account_id_v2"],
+            "mi18nLang":       "fr-fr",   
+        }
+    
+        self.load_btn.configure(text="Chargement...", state="disabled")
 
-        self.uid_entry.bind("<KeyRelease>", on_uid_change)
+        def load_data():
+            try:
+                avatars = get_all_characters(cookies, uid)
+                ids = [a["id"] for a in avatars]
+                details, property_map = get_character_details(cookies, uid, ids)
+                self.property_map = property_map
+                
+                self.characters = []
+                for d in details:
+                    self.characters.append({
+                        "id":       d["base"]["id"],
+                        "name":     d["base"]["name"],
+                        "image":    d["base"]["image"],
+                        "element":  d["base"]["element"],
+                        "level":    d["base"]["level"],
+                        "relics":   d["relics"],
+                    })
+                    
+                # Sauvegarder l'UID
+                self._save_cookies(self.active_cookies, uid=uid)
+                
+                # Pré_télécharger toutes les icônes en parallèle
+                def prefetch(url):
+                    try:
+                        get_icon(url)
+                    except Exception:
+                        pass
+                threads = []
+                for c in self.characters:
+                    t = threading.Thread(target=prefetch, args=(c["image"],), daemon=True)
+                    t.start()
+                    threads.append(t)
+                for t in threads:
+                    t.join()
+                
+                self.window.after(0, self._build_tabs)
+                
+            except Exception as e:
+                print(f"Erreur : {e}")
+                
+                # Si erreur d'auth -> reproposer la connexion
+                if "login" in str(e).lower():
+                    self.window.after(0,self._change_account)
+            finally:
+                self.window.after(0, lambda: self.load_btn.configure(
+                    text="Charger", state="normal"))
+
+        threading.Thread(target=load_data, daemon=True).start()
 
     # ── Onglets ───────────────────────────────────────────────────────────────
 
     def _build_tabs(self):
-        if hasattr(self, "tabview"):
-            self.tabview.destroy()
         if hasattr(self, "tab_bar_frame"):
             self.tab_bar_frame.destroy()
         if hasattr(self, "content_frame"):
@@ -170,7 +270,6 @@ class App:
         self.content_frame = ctk.CTkFrame(self.window, fg_color=DARK)
         self.content_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        self.current_scroll = None
         self.tab_buttons = []
 
         for i, character in enumerate(self.characters):
@@ -182,6 +281,7 @@ class App:
                 pil_img = get_icon(character["image"])
                 pil_img = pil_img.resize((64, 64))
                 ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(64, 64))
+                
             except Exception:
                 ctk_img = None
 
@@ -204,6 +304,8 @@ class App:
         if self.characters:
             self._show_character(0)
 
+
+    # ── Affichage personnage ──────────────────────────────────────────────────
 
     def _show_character(self, idx):
         # Highlight le bouton sélectionné
@@ -231,6 +333,7 @@ class App:
                 pil_img = pil_img.resize((64, 64))
                 ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(64, 64))
                 ctk.CTkLabel(card_inner, image=ctk_img, text="").pack(side="left", padx=(0, 10))
+                
             except Exception:
                 pass
 

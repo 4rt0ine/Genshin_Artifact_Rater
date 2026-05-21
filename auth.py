@@ -12,20 +12,25 @@ def login_and_get_cookies():
     """
     
     with sync_playwright() as p :
-        browser = p.chromium.launch(headless=False, args=["--window-size=500,700"])
-        context = browser.new_context()
+        browser = p.chromium.launch(
+            headless=False,
+            args=[
+                "--window-size=500,700",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+        )
         page = context.new_page()
         page.goto(HOYOLAB_URL)
         
         # Attendre que les cookies nécessaire apparaissent (max 3 minutes)
         for _ in range (180):
-            # Récuperer les cookies de tous les domaines
-            all_cookies = context.cookies()
-            cookies = {c["name"]: c["value"] for c in all_cookies}
-            print(list(cookies.keys()))
+            cookies = {c["name"]: c["value"] for c in context.cookies()}
             if all(k in cookies for k in COOKIES_NEEDED):
                 browser.close()
-                return {k: cookies[k] for k in cookies if k in ["ltuid_v2", "ltoken_v2", "account_mid_v2", "account_id_v2", "cookie_token_v2"]}
+                return {k: cookies[k] for k in COOKIES_NEEDED}
             time.sleep(1)
         browser.close()
         return None

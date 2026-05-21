@@ -17,6 +17,40 @@ HEADERS = {
 }
 
 
+def get_user_info(cookies):
+    """
+    Récupère les infos du compte connecté depuis les cookies.
+    Retourne le nickname et l'uid du compte Genshin.
+    """
+    # Récupération de l'UID depuis account_id dans les cookies
+    uid = cookies.get("account_id_v2") or cookies.get("ltuid_v2")
+
+    # Récupération de toutes les infos du compte avec l'API
+    url = "https://sg-public-api.hoyolab.com/event/game_record/genshin/api/index"
+    params = {
+        "server": "os_euro",
+        "role_id": uid,
+        "lang": "fr-fr"
+    }
+    response = requests.get(url, params=params, cookies=cookies, headers=HEADERS)
+    data = response.json()
+    
+    print(data)
+    
+    if data["retcode"] != 0:
+        raise Exception(f"Erreur AAPI : {data['message']}")
+    
+    # Extraction du nickname depuis la réponse
+    nickname = data["data"]["role"]["nickname"]
+    
+    
+    
+    return {
+        "uid": uid,
+        "nickname": nickname
+    }
+    
+
 
 def get_all_characters(cookies, uid, server="os_euro"):
     """Récupère la liste complète de tous les personnages du joueur."""
