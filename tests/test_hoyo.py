@@ -1,5 +1,5 @@
 import json
-from hoyolab import get_user_info, get_all_characters, get_character_details
+from src.hoyolab import get_user_info, get_all_characters, get_character_details
 
 # Charger les cookies
 with open("data/cookies.json", "r") as f:

@@ -42,7 +42,7 @@ else:
     
 """
 
-from auth import login_and_get_cookies
+from src.auth import login_and_get_cookies
 import json, os
 
 cookies = login_and_get_cookies()

@@ -3,9 +3,9 @@ import threading
 import json
 import os
 from PIL import Image
-from hoyolab import get_all_characters, get_character_details, get_icon
-from scoring import get_rolls_detail
-from auth import login_and_get_cookies
+from src.hoyolab import get_all_characters, get_character_details, get_icon
+from src.scoring import get_rolls_detail
+from src.auth import login_and_get_cookies
 
 GOLD  = "#c8a96e"
 BEIGE = "#f0e6d3"
