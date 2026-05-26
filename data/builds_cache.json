@@ -1,0 +1,178 @@
+{
+  "Nefer": {
+    "image_url": "https://sephijin.fr/wp-content/uploads/2025/11/nefer-catalyseur-dendro-guide-synthese-1.webp",
+    "image_hash": "43dd68a9aa32d33f7f24e0b5ae6ae8aa",
+    "last_update": "2026-05-26",
+    "build": {
+      "substats": "TC/DC > ME RE%",
+      "mainstat": {
+        "Sables du temps": [
+          "Maîtrise"
+        ],
+        "Coupe d'Eonothem": [
+          "Maîtrise"
+        ],
+        "Diadème de Logos": [
+          "DGT Crit",
+          "Taux Crit",
+          "Maîtrise"
+        ]
+      },
+      "weights": {
+        "Taux Crit": 1.0,
+        "DGT Crit": 1.0,
+        "ATQ%": 0.0,
+        "PV%": 0.0,
+        "DEF%": 0.0,
+        "Maîtrise": 0.8,
+        "Recharge": 0.6
+      }
+    }
+  },
+  "Lauma": {
+    "image_url": "https://sephijin.fr/wp-content/uploads/2025/09/lauma-catalyseur-dendro-guide-synthese.webp",
+    "image_hash": "7949626f91fb1361e8922214f9b5c9f2",
+    "last_update": "2026-05-26",
+    "build": {
+      "substats": "RE% DC ATQ% TC",
+      "mainstat": {
+        "Sables du temps": [
+          "Maîtrise",
+          "Recharge"
+        ],
+        "Coupe d'Eonothem": [
+          "Maîtrise"
+        ],
+        "Diadème de Logos": [
+          "Maîtrise"
+        ]
+      },
+      "weights": {
+        "Taux Crit": 0.4,
+        "DGT Crit": 0.8,
+        "ATQ%": 0.6,
+        "PV%": 0.0,
+        "DEF%": 0.0,
+        "Maîtrise": 0.0,
+        "Recharge": 1.0
+      }
+    }
+  },
+  "Furina": {
+    "image_url": "https://sephijin.fr/wp-content/uploads/2025/03/furina-epee-hydro-guide-synthese-scaled.webp",
+    "image_hash": "e920ce37869ef980680bb2fd01cf8e39",
+    "last_update": "2026-05-26",
+    "build": {
+      "substats": "RE% TC/DC PV%",
+      "mainstat": {
+        "Sables du temps": [
+          "Recharge"
+        ],
+        "Coupe d'Eonothem": [
+          "Bonus Hydro"
+        ],
+        "Diadème de Logos": [
+          "DGT Crit",
+          "Taux Crit"
+        ]
+      },
+      "weights": {
+        "Taux Crit": 0.8,
+        "DGT Crit": 0.8,
+        "ATQ%": 0.0,
+        "PV%": 0.6,
+        "DEF%": 0.0,
+        "Maîtrise": 0.0,
+        "Recharge": 1.0
+      }
+    }
+  },
+  "Mavuika": {
+    "image_url": "https://sephijin.fr/wp-content/uploads/2025/01/mavuika-claymore-pyro-guide-synthese.webp",
+    "image_hash": "3918c698415912a40264818180e51782",
+    "last_update": "2026-05-26",
+    "build": {
+      "substats": "DC/TC > ATQ% ME",
+      "mainstat": {
+        "Sables du temps": [
+          "ATQ%",
+          "Maîtrise"
+        ],
+        "Coupe d'Eonothem": [
+          "Bonus Pyro"
+        ],
+        "Diadème de Logos": [
+          "DGT Crit",
+          "Taux Crit"
+        ]
+      },
+      "weights": {
+        "Taux Crit": 1.0,
+        "DGT Crit": 1.0,
+        "ATQ%": 0.8,
+        "PV%": 0.0,
+        "DEF%": 0.0,
+        "Maîtrise": 0.6,
+        "Recharge": 0.0
+      }
+    }
+  },
+  "Sucrose": {
+    "image_url": "https://sephijin.fr/wp-content/uploads/2023/07/sucrose-catalyseur-anemo-guide-synthese.webp",
+    "image_hash": "b608d0db633367ea58f13ba04a1d2c9e",
+    "last_update": "2026-05-26",
+    "build": {
+      "substats": "ME RE%",
+      "mainstat": {
+        "Sables du temps": [
+          "Maîtrise"
+        ],
+        "Coupe d'Eonothem": [
+          "Maîtrise"
+        ],
+        "Diadème de Logos": [
+          "Maîtrise"
+        ]
+      },
+      "weights": {
+        "Taux Crit": 0.0,
+        "DGT Crit": 0.0,
+        "ATQ%": 0.0,
+        "PV%": 0.0,
+        "DEF%": 0.0,
+        "Maîtrise": 1.0,
+        "Recharge": 0.8
+      }
+    }
+  },
+  "Aino": {
+    "image_url": "https://sephijin.fr/wp-content/uploads/2026/04/aino-claymore-hydro-guide-synthese.webp",
+    "image_hash": "b20c96a58118f2123a43ec3cb2b1e42f",
+    "last_update": "2026-05-26",
+    "build": {
+      "substats": "ME RE% TC (SI FAVO)",
+      "mainstat": {
+        "Sables du temps": [
+          "Maîtrise",
+          "Recharge"
+        ],
+        "Coupe d'Eonothem": [
+          "Maîtrise"
+        ],
+        "Diadème de Logos": [
+          "Maîtrise",
+          "Taux Crit"
+        ]
+      },
+      "weights": {
+        "Taux Crit": 0.6,
+        "DGT Crit": 0.0,
+        "ATQ%": 0.0,
+        "PV%": 0.0,
+        "DEF%": 0.0,
+        "Maîtrise": 1.0,
+        "Recharge": 0.8
+      }
+    }
+  }
+}
