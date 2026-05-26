@@ -102,15 +102,19 @@ class App:
     def _do_login(self):
         self.connect_btn.configure(text="Connexion en cours...", state="disabled")
         
-        def do():
-            cookies = login_and_get_cookies()
-            if cookies:
-                self._save_cookies(cookies)
-                self.active_cookies = cookies
-                self.window.after(0, lambda: self.connect_btn.configure(
-                    text="Se connecter avec HoyoLAB", state="normal"))
+        # Forcer le rafraîchissement de l'UI avant de bloquer
+        self.window.update()
         
-        threading.Thread(target=do, daemon=True).start()
+        # Appel direct (bloque l'UI pendant la connexion)
+        cookies = login_and_get_cookies()
+        
+        if cookies:
+            self._save_cookies(cookies)
+            self.active_cookies = cookies
+            self._on_login_success()
+        else:
+            self.connect_btn.configure(
+                text="Se connecter avec HoYoLAB", state="normal")
     
     
     def _on_login_success(self):

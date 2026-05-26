@@ -1,6 +1,6 @@
 """
 builds.py — Généré automatiquement par update_builds.py
-Source : sephijin.fr (@sephijin) — utilisé avec accord de l'auteur
+Source : sephijin.fr (@sephijin)
 Ne pas modifier manuellement, relancer update_builds.py à la place.
 """
 
