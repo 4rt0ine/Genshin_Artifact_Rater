@@ -1,6 +1,7 @@
 __pycache__/
 data/cookies.json
 data/builds_cache.json
+data/builds.py
 assets/
 *.pyc
 .env
