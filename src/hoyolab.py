@@ -6,13 +6,9 @@ Gestion des appels à l'API HoYoLAB pour récupérer les données du joueur.
 Endpoints utilisés :
     - POST /character/list   → liste de tous les personnages du compte
     - POST /character/detail → artefacts détaillés par lot de 8 personnages
-    - GET  /api/index        → infos du profil (nickname) via account_id_v2
+    - GET  /api/index        → nickname via UID Genshin réel
+    - POST hoyowiki/get_entry_page_list → tous les persos du jeu (wiki)
     - GET  (externe)         → téléchargement et cache des icônes
-
-Headers :
-    Les headers reproduisent ceux envoyés par le site HoYoLAB en version
-    mobile (Android), ce qui est nécessaire pour que l'API accepte les requêtes.
-    Le cookie mi18nLang est ajouté côté app.py pour forcer le français.
 """
 
 import requests
@@ -20,10 +16,7 @@ import os
 import io
 from PIL import Image
 
-
-# ── Headers communs à toutes les requêtes HoYoLAB ────────────────────────────
-# Ces valeurs reproduisent exactement ce qu'envoie le navigateur sur HoYoLAB
-# en mode mobile Android. Ne pas modifier sans vérifier dans le Network.
+# ── Headers communs ───────────────────────────────────────────────────────────
 HEADERS = {
     "Accept":            "application/json, text/plain, */*",
     "Accept-Language":   "fr-FR,fr;q=0.9",
@@ -38,27 +31,19 @@ HEADERS = {
 }
 
 
-# ── Infos du compte connecté ──────────────────────────────────────────────────
+# ── Nickname HoYoLAB ──────────────────────────────────────────────────────────
 
-def get_hoyolab_nickname(cookies):
+def get_hoyolab_nickname(cookies, uid=None, server="os_euro"):
     """
-    Récupère le nickname HoYoLAB du compte connecté.
-    Utilise account_id_v2 comme role_id — c'est l'identifiant HoYoverse,
-    pas l'UID Genshin. Cet appel fonctionne juste après la connexion
-    Playwright, sans avoir à demander l'UID Genshin à l'utilisateur.
-
-    Retourne un dict {"nickname": str} ou None en cas d'erreur.
-    L'UID Genshin n'est pas inclus car account_id_v2 ≠ UID Genshin.
+    Récupère le nickname HoYoLAB depuis /api/index.
+    Nécessite le vrai UID Genshin (pas account_id_v2 qui est différent).
+    Retourne {"nickname": str} ou None en cas d'erreur.
     """
-    # account_id_v2 est l'identifiant HoYoverse (commun à tous les jeux HoYo)
-    uid = cookies.get("account_id_v2") or cookies.get("ltuid_v2")
+    if not uid:
+        return None
 
-    url = "https://sg-public-api.hoyolab.com/event/game_record/genshin/api/index"
-    params = {
-        "server":  "os_euro",
-        "role_id": uid,
-        "lang":    "fr-fr",
-    }
+    url    = "https://sg-public-api.hoyolab.com/event/game_record/genshin/api/index"
+    params = {"server": server, "role_id": uid, "lang": "fr-fr"}
 
     try:
         response = requests.get(url, params=params, cookies=cookies,
@@ -69,30 +54,23 @@ def get_hoyolab_nickname(cookies):
             print(f"get_hoyolab_nickname : retcode {data['retcode']} — {data['message']}")
             return None
 
-        nickname = data["data"]["role"]["nickname"]
-        return {"nickname": nickname}
+        return {"nickname": data["data"]["role"]["nickname"]}
 
     except Exception as e:
         print(f"get_hoyolab_nickname : erreur — {e}")
         return None
 
 
-# ── Personnages ───────────────────────────────────────────────────────────────
+# ── Personnages du compte ─────────────────────────────────────────────────────
 
 def get_all_characters(cookies, uid, server="os_euro"):
     """
     Récupère la liste complète de tous les personnages du joueur.
-    Utilise l'endpoint /character/list (POST) qui retourne TOUS les persos,
+    Utilise /character/list (POST) qui retourne TOUS les persos,
     contrairement à /api/index qui ne retourne que la vitrine (12 max).
-
-    Retourne une liste de dicts avec id, name, image, element, level, weapon.
     """
-    
-    url = "https://sg-public-api.hoyolab.com/event/game_record/genshin/api/character/list"
-    payload = {
-        "server":  server,
-        "role_id": str(uid),
-    }
+    url     = "https://sg-public-api.hoyolab.com/event/game_record/genshin/api/character/list"
+    payload = {"server": server, "role_id": str(uid)}
 
     response = requests.post(url, json=payload, cookies=cookies, headers=HEADERS)
     data     = response.json()
@@ -106,26 +84,23 @@ def get_all_characters(cookies, uid, server="os_euro"):
 def get_character_details(cookies, uid, character_ids, server="os_euro"):
     """
     Récupère les artefacts détaillés pour une liste de personnages.
-    L'API limite à 8 personnages par requête — on découpe en lots.
+    Découpe en lots de 8 (limite API HoYoLAB).
 
-    Retourne un tuple (characters, property_map) :
-        - characters   : liste des personnages avec leurs artefacts détaillés
-        - property_map : dict {property_type: {name, ...}} pour nommer les stats
-                         ex: {"20": {"name": "Taux CRIT"}, "22": {"name": "DGT CRIT"}}
+    Retourne (characters, property_map) :
+        - characters   : liste des persos avec artefacts
+        - property_map : {property_type: {name, ...}} pour nommer les stats
     """
-    
     url            = "https://sg-public-api.hoyolab.com/event/game_record/genshin/api/character/detail"
     all_characters = []
     property_map   = {}
 
-    # Découper en lots de 8 (limite de l'API HoYoLAB)
     for i in range(0, len(character_ids), 8):
         batch   = character_ids[i:i + 8]
         payload = {
             "server":        server,
             "role_id":       str(uid),
             "character_ids": batch,
-            "lang":          "fr-fr",  # Forcer les noms en français
+            "lang":          "fr-fr",
         }
 
         response = requests.post(url, json=payload, cookies=cookies, headers=HEADERS)
@@ -135,36 +110,89 @@ def get_character_details(cookies, uid, character_ids, server="os_euro"):
             raise Exception(f"Erreur API : {data['message']}")
 
         all_characters.extend(data["data"]["list"])
-
-        # Le property_map est retourné dans chaque réponse — on fusionne
-        # (les clés sont les mêmes pour tous les lots, pas de risque de conflit)
         property_map.update(data["data"]["property_map"])
 
     return all_characters, property_map
+
+
+# ── Personnages du jeu (wiki) ─────────────────────────────────────────────────
+
+def get_all_game_characters(cookies=None, lang="fr-fr"):
+    """
+    Récupère la liste de tous les personnages du jeu depuis le wiki HoYoLAB.
+    Pagine automatiquement pour récupérer les 122+ personnages.
+    Nécessite les cookies de session HoYoLAB.
+
+    Retourne une liste de dicts : {name, icon_url, element, rarity}
+    """
+    url     = "https://sg-act-public-api.hoyolab.com/hoyowiki/genshin/wapi/get_entry_page_list"
+    headers = {
+        "Content-Type":   "application/json",
+        "Origin":         "https://wiki.hoyolab.com",
+        "Referer":        "https://wiki.hoyolab.com/pc/genshin/aggregate/character",
+        "x-rpc-language": lang,
+        "x-rpc-lang":     lang,
+        "x-rpc-wiki_app": "hoyowiki",
+    }
+
+    characters = []
+    page_num   = 1
+    total      = None
+
+    while True:
+        payload = {
+            "filters":   [],
+            "menu_id":   "2",
+            "page_num":  page_num,
+            "page_size": 30,
+            "use_es":    True,
+        }
+
+        response = requests.post(url, json=payload, headers=headers,
+                                 cookies=cookies, timeout=10)
+        data     = response.json()
+
+        if data["retcode"] != 0:
+            raise Exception(f"Erreur wiki API : {data['message']}")
+
+        if total is None:
+            total = int(data["data"]["total"])
+
+        for entry in data["data"]["list"]:
+            filters = entry.get("filter_values", {})
+            element = filters.get("character_vision", {}).get("values", [""])[0]
+            rarity  = filters.get("character_rarity", {}).get("values", [""])[0]
+            characters.append({
+                "name":     entry["name"],
+                "icon_url": entry["icon_url"],
+                "element":  element,
+                "rarity":   rarity,
+            })
+
+        if len(characters) >= total:
+            break
+
+        page_num += 1
+
+    return characters
 
 
 # ── Cache des icônes ──────────────────────────────────────────────────────────
 
 def get_icon(url):
     """
-    Télécharge une icône depuis une URL et la met en cache dans assets/.
-    Si l'icône est déjà en cache, elle est chargée depuis le disque
-    sans faire de requête réseau.
-
-    Le nom du fichier cache est extrait depuis l'URL (dernier segment).
+    Télécharge une icône et la met en cache dans assets/.
+    Si déjà en cache, la charge depuis le disque sans requête réseau.
     Retourne un objet PIL.Image.
     """
     os.makedirs("assets", exist_ok=True)
 
-    # Extraire le nom de fichier depuis l'URL
     filename   = url.split("/")[-1]
     cache_path = f"assets/{filename}"
 
-    # Charger depuis le cache si disponible
     if os.path.exists(cache_path):
         return Image.open(cache_path)
 
-    # Télécharger et mettre en cache
     response = requests.get(url, timeout=10)
     img      = Image.open(io.BytesIO(response.content))
     img.save(cache_path)
