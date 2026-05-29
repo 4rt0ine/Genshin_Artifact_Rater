@@ -10,6 +10,7 @@ Gère :
     - Icônes placeholder générées avec Pillow pour les slots vides
     - Portrait du personnage en arrière-plan avec dégradé élémentaire
     - Cartes compactes qui remplissent uniformément l'espace vertical
+    - Portrait responsive : se recalcule à chaque redimensionnement de fenêtre
 """
 
 import threading
@@ -49,6 +50,10 @@ SLOTS = {
     5: ("Diadème de Logos",   "D"),
 }
 
+# Délai en ms avant de recalculer le portrait après un resize.
+# Évite de relancer le rendu à chaque pixel de déplacement de la fenêtre.
+_RESIZE_DEBOUNCE_MS = 50
+
 
 class CharactersView:
     """Vue principale des personnages et artefacts."""
@@ -85,18 +90,15 @@ class CharactersView:
         # ── Scroll horizontal ─────────────────────────────────────────────────
         canvas = self.tab_scroll._parent_canvas
 
-        # Glisser-déposer avec scan_mark/scan_dragto — méthode native Tkinter,
-        # plus fluide que calculer le delta manuellement
+        # Glisser-déposer avec scan_mark/scan_dragto
         canvas.bind("<ButtonPress-1>", lambda e: canvas.scan_mark(e.x, e.y))
         canvas.bind("<B1-Motion>",     lambda e: canvas.scan_dragto(e.x, e.y, gain=5))
 
-        # Molette normale → scroll horizontal (utile quand la souris est sur l'onglet)
+        # Molette normale → scroll horizontal
         canvas.bind("<MouseWheel>",
                     lambda e: canvas.xview_scroll(int(-e.delta / 10), "units"))
 
-        # Shift+molette → scroll horizontal uniquement si la souris est
-        # dans la zone de la barre d'onglets (y < 190px depuis le haut de la fenêtre)
-        # 60px (header) + 130px (tab_bar) = 190px
+        # Shift+molette → scroll horizontal uniquement dans la barre d'onglets
         def on_shift_scroll(e):
             root = self.parent.winfo_toplevel()
             y    = root.winfo_pointery() - root.winfo_rooty()
@@ -124,6 +126,8 @@ class CharactersView:
             self.show_character(0)
 
         threading.Thread(target=self._update_tab_icons, daemon=True).start()
+
+    # ── Onglets ───────────────────────────────────────────────────────────────
 
     def _build_tab(self, idx, character):
         """Onglet cliquable avec icône carrée + nom avec wraplength."""
@@ -186,20 +190,16 @@ class CharactersView:
             widget.destroy()
 
         character = self.characters[idx]
+        
 
-        # Conteneur principal
-        container = ctk.CTkFrame(self.artifacts_frame, fg_color=BG, corner_radius=0)
-        container.pack(fill="both", expand=True)
-
-        # Zone des cartes d'artefacts
-        # padx à droite laisse de la place au portrait sans que les cartes débordent
-        relics_frame = ctk.CTkFrame(container, fg_color="transparent", corner_radius=0)
+        # ── Cartes d'artefacts ─────────────────────────
+        relics_frame = ctk.CTkFrame(
+            self.artifacts_frame,
+            fg_color="transparent",
+            corner_radius=0
+        )
         relics_frame.pack(fill="both", expand=True, padx=15, pady=8)
         
-        # Canvas pour le portrait en arrière-plan (premier plan temporaire)
-        self.canvas = ctk.CTkCanvas(container, highlightthickness=0, bg=BG)
-        self.canvas.place(x=0, y=0, relwidth=1.0, relheight=1.0)
-        # self.canvas._canvas.tkraise()
 
         # Dict pos → relic pour accès rapide
         relic_by_pos = {r["pos"]: r for r in character["relics"]}
@@ -208,14 +208,6 @@ class CharactersView:
         for pos, (slot_name, letter) in SLOTS.items():
             relic = relic_by_pos.get(pos)
             self._build_relic_card(relics_frame, relic, pos, slot_name, letter)
-
-        # Portrait en arrière-plan
-        element = character.get("element", "")
-        threading.Thread(
-            target=self._load_portrait_background,
-            args=(character["image"], element),
-            daemon=True
-        ).start()
 
     # ── Icônes placeholder ────────────────────────────────────────────────────
 
@@ -279,73 +271,6 @@ class CharactersView:
             except Exception:
                 pass
 
-    # ── Portrait en arrière-plan ──────────────────────────────────────────────
-
-    def _load_portrait_background(self, image_url, element):
-        """
-        Charge le portrait, applique le dégradé élémentaire
-        et l'affiche sur le canvas à droite en arrière-plan.
-        """
-        try:
-            pil_img = get_icon(image_url).convert("RGBA")
-
-            self.parent.update_idletasks()
-            zone_h = self.artifacts_frame.winfo_height()
-            zone_w = self.artifacts_frame.winfo_width()
-
-            if zone_h < 10 or zone_w < 10:
-                return
-
-            w, h    = pil_img.size
-            ratio   = zone_h / h
-            new_w   = int(w * ratio)
-            new_h   = zone_h
-            pil_img = pil_img.resize((new_w, new_h), Image.LANCZOS)
-
-            # Masque de fondu horizontal
-            mask      = Image.new("L", (new_w, new_h), 0)
-            draw_mask = ImageDraw.Draw(mask)
-            fade_w    = int(new_w * 0.5)
-            for x in range(new_w):
-                alpha = int((x / fade_w) * 220) if x < fade_w else 220
-                draw_mask.line([(x, 0), (x, new_h)], fill=min(alpha, 220))
-            pil_img.putalpha(mask)
-
-            # Dégradé élémentaire
-            elem_color  = ELEMENT_COLORS.get(element, (200, 180, 150))
-            bg          = Image.new("RGBA", (new_w, new_h), BG_RGB + (255,))
-            color_layer = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
-            color_draw  = ImageDraw.Draw(color_layer)
-            for x in range(new_w):
-                t     = x / new_w
-                r     = int(BG_RGB[0] * (1 - t) + elem_color[0] * t)
-                g     = int(BG_RGB[1] * (1 - t) + elem_color[1] * t)
-                b     = int(BG_RGB[2] * (1 - t) + elem_color[2] * t)
-                color_draw.line([(x, 0), (x, new_h)], fill=(r, g, b, int(t * 80)))
-
-            result  = Image.alpha_composite(bg, color_layer)
-            result  = Image.alpha_composite(result, pil_img)
-            result  = result.convert("RGB")
-            x_pos   = zone_w - new_w
-            ctk_img = ctk.CTkImage(light_image=result, dark_image=result,
-                                    size=(new_w, new_h))
-
-            def place_on_canvas(img=ctk_img, x=x_pos):
-                try:
-                    if hasattr(self, "canvas") and self.canvas.winfo_exists():
-                        lbl = ctk.CTkLabel(self.canvas, image=img, text="",
-                                           fg_color="transparent")
-                        lbl.place(x=x, y=0)
-                        self._portrait_label = lbl
-                        self._portrait_img   = img
-                except Exception:
-                    pass
-
-            self.parent.after(0, place_on_canvas)
-
-        except Exception as e:
-            print(f"Portrait background erreur : {e}")
-
     # ── Cartes d'artefacts ────────────────────────────────────────────────────
 
     def _build_relic_card(self, parent, relic, pos, slot_name, letter):
@@ -367,7 +292,7 @@ class CharactersView:
         card_inner = ctk.CTkFrame(card, fg_color="transparent")
         card_inner.pack(fill="x", padx=10, pady=8)
 
-        # Icône
+        # ── Icône de l'artefact ───────────────────────────────────────────────
         if is_empty:
             ctk_img = self._make_placeholder_icon(pos, size=48)
         else:
@@ -397,7 +322,7 @@ class CharactersView:
                          font=ctk.CTkFont(family="Georgia", size=13),
                          anchor="w").pack(fill="x")
         else:
-            # Mainstat
+            # ── Mainstat ──────────────────────────────────────────────────────
             main      = relic.get("main_property") or {}
             main_type = str(main.get("property_type", "?"))
             main_name = self.property_map.get(main_type, {}).get("name", main_type)
@@ -412,7 +337,7 @@ class CharactersView:
             ctk.CTkFrame(info, fg_color=GOLD, height=1,
                          corner_radius=0).pack(fill="x", pady=(2, 3))
 
-            # Substats sur 2 colonnes
+            # ── Substats sur 2 colonnes ───────────────────────────────────────
             subs = relic.get("sub_property_list", [])
             if subs:
                 sub_frame = ctk.CTkFrame(info, fg_color="transparent")
